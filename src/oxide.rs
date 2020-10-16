@@ -4,7 +4,7 @@ use std::io;
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::sync::{Arc, RwLock};
 use std::thread::{spawn, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 // SSTP multicast address.
 const DEFAULT_V4_MULTICAST_ADDRESS: [u8; 4] = [239, 255, 255, 250];
 
@@ -16,6 +16,9 @@ const INADDR_ANY: [u8; 4] = [0, 0, 0, 0];
 
 // The default amount of time between multicast transmission.
 const DEFAULT_TRANSMISSION_DELAY: Duration = Duration::from_millis(250);
+
+// Default timeout time.
+const DEFAULT_TRANSMISSION_TIMEOUT: Duration = Duration::from_secs(60);
 
 // Default transmitted message.
 const DEFAULT_MESSAGE: &[u8] = b"discover";
@@ -55,6 +58,7 @@ pub struct Discovery {
     multicast_addr: SocketAddr,
     binding_addr: SocketAddr,
     transmission_delay: Duration,
+    transmission_timeout: Duration,
     message: Vec<u8>,
 }
 
@@ -77,8 +81,9 @@ impl Discovery {
         let Discovery {
             multicast_addr,
             binding_addr,
-            message,
             transmission_delay,
+            transmission_timeout,
+            message,
         } = self.clone();
 
         let peerlist = Arc::new(RwLock::new(Vec::new()));
@@ -95,7 +100,7 @@ impl Discovery {
 
         // Start the broadcasting, pass the stopper.
         let broadcast_thread = concurrent! {
-            broadcast(send_socket, &multicast_addr, transmission_delay, message, &broadcast_stopper).unwrap();
+            broadcast(send_socket, &multicast_addr, transmission_delay, transmission_timeout, message, &broadcast_stopper).unwrap();
         };
 
         let peers = peerlist.clone();
@@ -178,16 +183,31 @@ fn receiver<C: Fn(&mut Vec<Peer>) + std::marker::Send + 'static>(
                 return Ok(());
             }
         }
-        let (amount, src) = socket.recv_from(&mut buff).unwrap();
-        let peer = Peer {
-            ip: src.ip(),
-            data: buff[0..amount].to_vec(),
+
+        // Might want this to be dynamic.
+        socket.set_read_timeout(Some(DEFAULT_TRANSMISSION_DELAY))?;
+
+        // Receive data non-blocking.
+        match socket.recv_from(&mut buff) {
+            Ok((amount, src)) => {
+                // Succsess
+                let peer = Peer {
+                    ip: src.ip(),
+                    data: buff[0..amount].to_vec(),
+                };
+                let mut peerlist_guard = peerlist.write().expect("Deadlock");
+                if !peerlist_guard.contains(&peer) {
+                    peerlist_guard.push(peer);
+                    callback(&mut (*peerlist_guard).clone())
+                }
+            }
+            Err(err) => {
+                // Check would block... If not it's an actual error.
+                if err.kind() != io::ErrorKind::WouldBlock {
+                    return Err(err);
+                }
+            }
         };
-        let mut peerlist_guard = peerlist.write().expect("Deadlock");
-        if !peerlist_guard.contains(&peer) {
-            peerlist_guard.push(peer);
-            callback(&mut (*peerlist_guard).clone())
-        }
     }
 }
 
@@ -195,13 +215,25 @@ fn broadcast(
     socket: UdpSocket,
     multicast_address: &SocketAddr,
     transmission_delay: Duration,
+    transmission_timeout: Duration,
     message: Vec<u8>,
     stopper: &RwLock<bool>,
 ) -> Result<(), io::Error> {
     if cfg!(debug_assertions) {
         socket.set_multicast_loop_v4(false)?;
     }
+
+    let start_time = SystemTime::now();
     loop {
+        let delta = SystemTime::now()
+            .duration_since(start_time)
+            .expect("Time is broken!");
+
+        if delta >= transmission_timeout {
+            let mut stop = stopper.write().expect("Deadlock");
+            *stop = true;
+            return Ok(());
+        }
         {
             let stop = stopper.read().expect("Deadlock");
             if *stop {
