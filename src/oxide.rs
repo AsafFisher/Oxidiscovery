@@ -5,22 +5,22 @@ use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::sync::{Arc, RwLock};
 use std::thread::{spawn, JoinHandle};
 use std::time::{Duration, SystemTime};
-// SSTP multicast address.
+/// SSTP multicast address.
 const DEFAULT_V4_MULTICAST_ADDRESS: [u8; 4] = [239, 255, 255, 250];
 
-// Default port number.
-const DEFAULT_PORT_NUMBER: u16 = 9999;
+/// Default port number.
+const DEFAULT_PORT_NUMBER: u16 = 9911;
 
-// Default binding address.
+/// Default binding address.
 const INADDR_ANY: [u8; 4] = [0, 0, 0, 0];
 
-// The default amount of time between multicast transmission.
+/// Default amount of time between multicast transmission.
 const DEFAULT_TRANSMISSION_DELAY: Duration = Duration::from_millis(250);
 
-// Default timeout time.
+/// Default timeout time.
 const DEFAULT_TRANSMISSION_TIMEOUT: Duration = Duration::from_secs(60);
 
-// Default transmitted message.
+/// Default transmitted message.
 const DEFAULT_MESSAGE: &[u8] = b"discover";
 
 macro_rules! concurrent {
@@ -67,13 +67,36 @@ impl Default for Discovery {
         Self {
             multicast_addr: SocketAddr::from((DEFAULT_V4_MULTICAST_ADDRESS, DEFAULT_PORT_NUMBER)),
             binding_addr: SocketAddr::from((INADDR_ANY, DEFAULT_PORT_NUMBER)),
-            message: DEFAULT_MESSAGE.to_vec(),
             transmission_delay: DEFAULT_TRANSMISSION_DELAY,
+            transmission_timeout: DEFAULT_TRANSMISSION_TIMEOUT,
+            message: DEFAULT_MESSAGE.to_vec(),
         }
     }
 }
 
 impl Discovery {
+    /// Example #1
+    /// ```rust
+    /// # use std::error::Error;
+    /// # use std::thread::sleep;
+    /// # use std::time::Duration;
+    /// # use oxidiscovery::{Discovery, Peer};
+    /// #
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    ///   let peer_discovery: Discovery = Default::default();
+    ///
+    ///   // peer_list was cloned and moved here
+    ///   let mut manager = peer_discovery
+    ///       .discover(move |peer_list| {
+    ///           println!("{:?}", peer_list);
+    ///       })?;
+    ///
+    ///    // Will take 60 seconds for the timeout to hit.
+    ///    manager.wait();
+    /// #
+    /// #  Ok(())
+    /// # }
+    /// ```
     pub fn discover<C: Fn(&mut Vec<Peer>) + std::marker::Send + 'static>(
         &self,
         callback: C,
