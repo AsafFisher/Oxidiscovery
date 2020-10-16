@@ -160,7 +160,16 @@ impl DiscoveryManagment {
             let mut w_stop = self.stopper.write().expect("Deadlock");
             *w_stop = true;
         }
+        if let Some(h) = self.broadcast_thread.take() {
+            h.join().expect("Deadlock");
+        }
+        if let Some(h) = self.receiver_thread.take() {
+            h.join().expect("Deadlock");
+        }
+    }
 
+    pub fn wait(&mut self) {
+        println!("Waiting");
         if let Some(h) = self.broadcast_thread.take() {
             h.join().expect("Deadlock");
         }
