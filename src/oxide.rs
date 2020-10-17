@@ -214,7 +214,7 @@ impl DiscoveryManagment {
         }
     }
 
-    /// Check if discovery is still alive, if not block untill threads will join.
+    /// Check if discovery is still alive. if not, block untill threads will join.
     pub fn is_alive(&mut self) -> bool {
         let should_stop: bool;
 
