@@ -76,7 +76,7 @@ impl Default for Discovery {
 
 impl Discovery {
     /// Example #1
-    /// ```rust
+    /// ```no_run
     /// # use std::error::Error;
     /// # use std::thread::sleep;
     /// # use std::time::Duration;
@@ -98,7 +98,7 @@ impl Discovery {
     /// # }
     /// ```
     /// Example #2
-    /// ```rust
+    /// ```no_run
     /// # use std::error::Error;
     /// # use std::thread::sleep;
     /// # use std::time::Duration;
