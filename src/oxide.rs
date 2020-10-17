@@ -178,7 +178,23 @@ impl DiscoveryManagment {
         }
     }
 
-    #[allow(dead_code)]
+    /// Check if discovery is still alive, if not block untill threads will join.
+    pub fn is_alive(&mut self) -> bool {
+        let should_stop: bool;
+
+        // Scooped
+        {
+            let w_stop = self.stopper.read().expect("Deadlock");
+            should_stop = *w_stop;
+        }
+
+        if should_stop {
+            self.wait();
+            return false;
+        }
+        return true;
+    }
+
     pub fn get_peers(&self) -> Vec<Peer> {
         let peerlist_guard = self.peerlist.read().expect("Deadlock");
         return (*peerlist_guard).clone();
