@@ -97,6 +97,42 @@ impl Discovery {
     /// #  Ok(())
     /// # }
     /// ```
+    /// Example #2
+    /// ```rust
+    /// # use std::error::Error;
+    /// # use std::thread::sleep;
+    /// # use std::time::Duration;
+    /// # use std::sync::{Arc, RwLock};
+    /// # use oxidiscovery::{Discovery, Peer};
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    ///   let lpeers: Arc<RwLock<Vec<Peer>>> = Arc::new(RwLock::new(Vec::new()));
+    ///   let peers = lpeers.clone();
+    ///
+    ///   let peer_discovery: Discovery = Default::default();
+    ///   // peer_list was cloned and moved here
+    ///   let mut manager = peer_discovery
+    ///       .discover(move |peer_list| {
+    ///           let mut lock = peers.write().unwrap();
+    ///           lock.clear();
+    ///           lock.append(peer_list)
+    ///       })
+    ///       .or_else(|err| Err(err))?;
+    ///
+    ///   loop {
+    ///       let b = &mut manager;
+    ///
+    ///       let lock = lpeers.read();
+    ///       let peers = lock.unwrap();
+    ///       if !peers.is_empty() || !b.is_alive() {
+    ///           println!("{:?}", peers);
+    ///           b.stop();
+    ///           break;
+    ///       }
+    ///       std::thread::sleep(std::time::Duration::from_millis(250))
+    ///   }
+    ///   Ok(())
+    /// }
+    /// ```
     pub fn discover<C: Fn(&mut Vec<Peer>) + std::marker::Send + 'static>(
         &self,
         callback: C,
