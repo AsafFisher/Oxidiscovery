@@ -55,11 +55,11 @@ impl PartialEq for Peer {
 
 #[derive(Clone)]
 pub struct Discovery {
-    multicast_addr: SocketAddr,
-    binding_addr: SocketAddr,
-    transmission_delay: Duration,
-    transmission_timeout: Duration,
-    message: Vec<u8>,
+    pub multicast_addr: SocketAddr,
+    pub binding_addr: SocketAddr,
+    pub transmission_delay: Duration,
+    pub transmission_timeout: Duration,
+    pub message: Vec<u8>,
 }
 
 impl Default for Discovery {
